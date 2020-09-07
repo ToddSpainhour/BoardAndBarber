@@ -9,15 +9,21 @@ namespace BoardAndBarber.Data
     public class CustomerRepository
     {
 
+        // files named xyzRepository deal with storing data around xyz, usually crud methods
 
 
+        // this list will be our pretend database
+        // because the static keyword here I will get one copy of this list for every instance of the respository class
         static List<Customer> _customers = new List<Customer>();
+
+
 
 
 
         public void Add(Customer customerToAdd)
         {
-            var newId = 0;
+            //get the next id by finding the max current id
+            var newId = 1;
             if (_customers.Count > 0)
             {
             newId = _customers.Select(p => p.Id).Max() + 1;
@@ -29,6 +35,8 @@ namespace BoardAndBarber.Data
 
 
 
+
+
         public List<Customer> GetAll()
         {
             return _customers;
@@ -36,10 +44,14 @@ namespace BoardAndBarber.Data
 
 
 
+
+
         public Customer GetById(int id)
         {
             return _customers.FirstOrDefault(c => c.Id == id);
         }
+
+
 
 
 
@@ -57,12 +69,18 @@ namespace BoardAndBarber.Data
 
 
 
+
+
         public void Remove (int id)
         {
             var customerToDelete = GetById(id);
 
             _customers.Remove(customerToDelete);
         }
+
+
+
+
 
     }
 }
