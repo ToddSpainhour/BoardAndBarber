@@ -29,6 +29,7 @@ namespace BoardAndBarber
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        // It allows us a way to change the way our application processes an HTTP request
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
@@ -41,6 +42,8 @@ namespace BoardAndBarber
             app.UseRouting();
 
             app.UseAuthorization();
+
+            app.UseCors(policy => policy.AllowAnyHeader().AllowAnyOrigin().AllowAnyMethod());
 
             app.UseEndpoints(endpoints =>
             {
