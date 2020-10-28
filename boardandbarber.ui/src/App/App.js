@@ -1,13 +1,13 @@
 import './App.scss';
 import '../index';
 import '../components/shared/SingleCustomer/SingleCustomer'
-import SingleCustomer from '../components/shared/SingleCustomer/SingleCustomer';
+import Customers from '../components/pages/Customer/Customer';
 
 function App() {
   return (
     <div className="App">
       <p>Hello there.</p>
-      <SingleCustomer id="1" name="Todd" birthday="1/2/1234" favoriteBarber="Jimbo" notes="no talking"/>
+      <Customers />
     </div>
   );
 }
