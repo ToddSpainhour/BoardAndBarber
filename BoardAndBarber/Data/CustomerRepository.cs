@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using BoardAndBarber.Models;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Dapper;
  
 
 namespace BoardAndBarber.Data
@@ -16,9 +18,12 @@ namespace BoardAndBarber.Data
 
         // this list will be our pretend database
         // because the static keyword here I will get one copy of this list for every instance of the respository class
-        static List<Customer> _customers = new List<Customer>();
+        readonly string _connectionString;
 
-        const string _connectionString = "Server = localHost; Database = BoardAndBarber; Trusted_Connection = True;";
+        public CustomerRepository(IConfiguration configuration)
+        {
+            _connectionString = configuration.GetConnectionString("BoardAndBarber");
+        }
 
 
 
@@ -35,40 +40,12 @@ namespace BoardAndBarber.Data
                         VALUES
                             (@name,@birthday,@favoritebarber,@notes)";
 
-            // name of parameter and value must match
+            using var db = new SqlConnection(_connectionString);
 
-            using var connection = new SqlConnection(_connectionString);
-            connection.Open();
+            var newId = db.ExecuteScalar<int>(sql, customerToAdd);
 
-            var cmd = connection.CreateCommand();
-            cmd.CommandText = sql;
-
-            // always use Parameters here to prevent sql injection
-            cmd.Parameters.AddWithValue("name", customerToAdd.Name);
-            cmd.Parameters.AddWithValue("birthday", customerToAdd.Birthday);
-            cmd.Parameters.AddWithValue("favoriteBarber", customerToAdd.FavoriteBarber);
-            cmd.Parameters.AddWithValue("notes", customerToAdd.Notes);
-
-
-            var rows = (int) cmd.ExecuteScalar();
-            
-            if (rows != 1)
-            {
-                //something bad happened
-            }
-
-            // sql now does this for us
-            ////get the next id by finding the max current id
-            //var newId = 1;
-            //if (_customers.Count > 0)
-            //{
-            //newId = _customers.Select(p => p.Id).Max() + 1;
-            //}
-            //customerToAdd.Id = newId;
-
-            //_customers.Add(customerToAdd);
+            customerToAdd.Id = newId;
         }
-
 
 
 
@@ -76,128 +53,81 @@ namespace BoardAndBarber.Data
         public List<Customer> GetAll()
         {
 
-            using var connection = new SqlConnection(_connectionString);
+            using var db = new SqlConnection(_connectionString);
 
-            connection.Open();
-
-            var command = connection.CreateCommand();
-
-            var sql = "SELECT * FROM customers";
-
-            command.CommandText = sql;
-
-            var reader = command.ExecuteReader();
-            var customers = new List<Customer>();
-
-            while (reader.Read())
+            try
             {
-                //take results from SQL and map them
-                var customer = MapToCustomer(reader);
-                customers.Add(customer);
+                var customers = db.Query<Customer>("SELECT * FROM Customers");
+
+                return customers.ToList();
             }
-            return customers;
-            //return _customers;
+
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return null;
+                //throw;
+            }
         }
 
 
 
-
-
-
-
-
-
-
-
-        public Customer GetById(int id)
+        public Customer GetById(int customerId)
         {
-            // 1: connect to your database // the using statement here uses a disposing statement which means when it exits the block it closes
-            // 'using var' means when it's done, dispose of it
-            using var connection = new SqlConnection("Server = localHost; Database = BoardAndBarber; Trusted_Connection = True;");
-            
+            using var db = new SqlConnection(_connectionString);
 
-                // 2. Open the Conncetion
-                connection.Open();
+            var query = @"SELECT *
+                          FROM Customers
+                          WHERE id = @cid";
 
-                // 3. Give SQL Server a command
-                var command = connection.CreateCommand();
-                var query = $@"select *
-                        from Customers
-                        WHERE id = {id}";
+            var parameters = new { cid = customerId };
 
-                // 4. set that command's command text
-                command.CommandText = query;
+            var customer = db.QueryFirstOrDefault<Customer>(query, parameters);
 
-                // 5.  make it go!
-
-                //command.ExecuteNonQuery(); // run this query, I don't care about the results (like a delete) , returns int
-
-                //command.ExecuteScalar();  // run this query and only return top left cell, returns object
-
-                var reader = command.ExecuteReader(); // run this query and give me all the rows back one at a time, then you do something with that row, then move to the next row, returns SqlDataReader
-
-                reader.Read(); // return boolean, true if there is a row to read
-                               //sql server has excuted the command and is waiting to give us results
-
-                if (reader.Read())
-                {
-                    
-
-
-                return MapToCustomer(reader);
-
-                }
-                else
-                {
-                    connection.Close();
-                    //no results? What do we do?
-                    return null;
-                }
-
-                // only so many connections are possible so use a using statement at the top
-                // return _customers.FirstOrDefault(c => c.Id == id);
+            return customer;
         }
 
 
 
-
-
-        public Customer Update (int id, Customer customer)
+        public Customer Update(int id, Customer customer)
         {
-            var customerToUpdate = GetById(id);
+            var sql = @"UPDATE [dbo].[Customers]
+                          SET [Name] = @name
+                             ,[Birthday] = @birthday
+                             ,[FavoriteBarber] = @favoriteBarber
+                             ,[Notes] = @notes
+                        output inserted.*
+                        WHERE id = @id";
 
-            customerToUpdate.Birthday = customer.Birthday;
-            customerToUpdate.FavoriteBarber = customer.FavoriteBarber;
-            customerToUpdate.Notes = customer.Notes;
-            customerToUpdate.Name = customer.Name;
+            using var db = new SqlConnection(_connectionString);
 
-            return customerToUpdate;
+            // if property names should match the name of the property or variable on the right, you don't have to specify.  
+            // you can leave off the property name if the name on the right and the property name match.
+            var parameters = new
+            {
+                Name = customer.Name,
+                Birthday = customer.Birthday,
+                FavoriteBarber = customer.FavoriteBarber,
+                Notes = customer.Notes,
+                id = id
+            };
+
+            var updatedCustomer = db.QueryFirstOrDefault<Customer>(sql, parameters);
+
+            return updatedCustomer;
         }
 
 
 
-
-
-        public void Remove (int id)
+        public void Remove (int customerId)
         {
-            var customerToDelete = GetById(id);
+            var sql = @"DELETE 
+                        FROM [dbo].[Customers]
+                        WHERE Id = @id";
 
-            _customers.Remove(customerToDelete);
-        }
+            using var db = new SqlConnection(_connectionString);
 
-
-        private Customer MapToCustomer(SqlDataReader reader)
-        {
-
-            var customerFromDb = new Customer();
-
-            customerFromDb.Id = (int)reader["id"]; // the (int) is an 'explicit cast' telling compiler it will be an int, throws exception if it's not the type identified
-            customerFromDb.Notes = reader["Notes"] as string; // implicit cast
-            customerFromDb.Birthday = DateTime.Parse(reader["Birthday"].ToString()); // parsing
-            customerFromDb.FavoriteBarber = reader["FavoriteBarber"].ToString(); // what's inside the [] must be the same as the Db
-            customerFromDb.Notes = reader["Notes"].ToString();
-
-            return customerFromDb;
+            db.Execute(sql, new { id = customerId });
         }
 
 
